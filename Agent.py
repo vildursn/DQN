@@ -1,18 +1,23 @@
 import numpy as np
 import tensorflow as tf
+import keras.models
+from keras.models import Sequential
+from keras.layers import Activation, Dense
 from tensorflow.keras.callbacks import TensorBoard
+import time
 
+DISCOUNT = 0.99
 REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1_000
 TRAIN_BATCH_SIZE = 100
-UPDATE_TARGET_NUM = 50
+UPDATE_TARGET_NUM = 10
 
 class DQN_Agent():
     #self.Q_function = Q_function()
     #self.replay_memory = Replay
-    def __init__(self, D_size,obs_space, action_space, epsilon, gamma, alpha, activation_function,hidden_layers_dim):
-        self.replay_memory = tf.queue.QueueBase.FIFOQueue(capacity = D_size, dtypes=[float, int, float, float], shape =  [len(self.obs_space), len(self.action_space),1, len(self.obs_space)])
-        self.d_siz = D_size
+#obs space and action space just wants their lengths, and they are all assumed to be discrete?
+    def __init__(self,D_size,obs_space, action_space, epsilon, gamma, alpha, activation_function,hidden_layers_dim):
+        self.d_size = D_size
         self.target_update_counter = 0
         self.epsilon = epsilon
         self.gamma = gamma
@@ -21,19 +26,23 @@ class DQN_Agent():
         self.action_space = action_space
         self.hidden_layers_dim = hidden_layers_dim
         self.activation_function = activation_function
-        self.model = self.Q_function()
-        self.target_model = self.Q_function()
+        self.replay_memory = tf.queue.FIFOQueue(D_size, dtypes='int64')#, shape =  [self.obs_space, self.action_space,1, self.obs_space])
+
+
+        self.model = self.createNN()
+        self.target_model = self.createNN()
         self.target_model.set_weights(self.model.get_weights())
-        self.tensorboard = ModifiedTensorBoard(log_dir="logs/{}-{}".format(MODEL_NAME, int(time.time())))
+
+        self.tensorboard = ModifiedTensorBoard(log_dir="logs/{}-{}".format('MODEL_NAME', int(time.time())))
 
     def createNN(self):
-        model = tf.keras.models.Sequential()
+        model = Sequential()
         model.add(Dense(self.hidden_layers_dim[0], input_shape=(self.obs_space,)))
         for i in range(1,len(self.hidden_layers_dim)):
-            if len(self.activation_function) == len(self.hidden_layers_dim): #If there are different activation functions for different hidden layers
-                model.add(Dense(self.hidden_layers_dim[i]), activation = self.activation_function[i])
+            if len(self.hidden_layers_dim)== len(self.activation_function): #If there are different activation functions for different hidden layers
+                model.add(Dense(self.hidden_layers_dim[i], activation = self.activation_function[i]))
             else:
-                model.add(Dense(self.hidden_layers_dim[i]), activation = self.activation_function)
+                model.add(Dense(self.hidden_layers_dim[i], activation = self.activation_function[0]))
         model.add(Dense(self.action_space, activation = tf.nn.sigmoid))
         model.compile(loss='mse', optimizer='sgd', learning_rate = self.alpha)
         return model
