@@ -7,7 +7,7 @@ from tensorflow.keras.callbacks import TensorBoard
 import time
 
 DISCOUNT = 0.99
-REPLAY_MEMORY_SIZE = 50_000
+REPLAY_MEMORY_SIZE = 50
 MIN_REPLAY_MEMORY_SIZE = 1_000
 TRAIN_BATCH_SIZE = 100
 UPDATE_TARGET_NUM = 10
@@ -26,7 +26,8 @@ class DQN_Agent():
         self.action_space = action_space
         self.hidden_layers_dim = hidden_layers_dim
         self.activation_function = activation_function
-        self.replay_memory = tf.queue.FIFOQueue(D_size, dtypes='int64')#, shape =  [self.obs_space, self.action_space,1, self.obs_space])
+        datatype=['int64']*obs_space
+        self.replay_memory = tf.queue.FIFOQueue(REPLAY_MEMORY_SIZE, dtypes=['int64','int64','int64','int64','bool'])#, shape=[obs_space,1,1,obs_space,1], shape =  [self.obs_space, self.action_space,1, self.obs_space])
 
 
         self.model = self.createNN()
@@ -44,20 +45,20 @@ class DQN_Agent():
             else:
                 model.add(Dense(self.hidden_layers_dim[i], activation = self.activation_function[0]))
         model.add(Dense(self.action_space, activation = tf.nn.sigmoid))
-        model.compile(loss='mse', optimizer='sgd', learning_rate = self.alpha)
+        model.compile(loss='mse', optimizer='sgd')#learning_rate = self.alpha,
         return model
 
     def get_q_values(self, obs):
         return self.model.predict(obs)
 
     def get_action(self, obs):
-        return np.max(self.target_model.predict(obs))
+        return np.argmax(self.target_model.predict(obs))
 
 
-    def update_replay_memory(self,sars):
-        if self.replay_memory.size() == self.D_size:
+    def update_replay_memory(self,sars_d):
+        if self.replay_memory.size() == REPLAY_MEMORY_SIZE:
             self.replay_memory.dequeue()
-        self.replay_memory.enqueue(sars)
+        self.replay_memory.enqueue(sars_d)
 
     def update_network(self):
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
