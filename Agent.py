@@ -5,13 +5,17 @@ from keras.models import Sequential
 from keras.layers import Activation, Dense
 from tensorflow.keras.callbacks import TensorBoard
 import time
+import random
 
 DISCOUNT = 0.99
 REPLAY_MEMORY_SIZE = 50
 MIN_REPLAY_MEMORY_SIZE = 1_000
-TRAIN_BATCH_SIZE = 100
+MINI_BATCH_SIZE = 100
 UPDATE_TARGET_NUM = 10
 
+class replay_memory():
+    def __init__(self, size):
+        pass
 class DQN_Agent():
     #self.Q_function = Q_function()
     #self.replay_memory = Replay
@@ -26,9 +30,10 @@ class DQN_Agent():
         self.action_space = action_space
         self.hidden_layers_dim = hidden_layers_dim
         self.activation_function = activation_function
-        datatype=['int64']*obs_space
-        self.replay_memory = tf.queue.FIFOQueue(REPLAY_MEMORY_SIZE, dtypes=['int64','int64','int64','int64','bool'])#, shape=[obs_space,1,1,obs_space,1], shape =  [self.obs_space, self.action_space,1, self.obs_space])
-
+        #datatype=[tf.int64]*(self.obs_space*2+2)
+        #datatype.append(tf.bool)
+        #self.replay_memory = tf.queue.FIFOQueue(REPLAY_MEMORY_SIZE, dtypes=datatype)#, shape=[obs_space,1,1,obs_space,1], shape =  [self.obs_space, self.action_space,1, self.obs_space])
+        self.replay_memory = []
 
         self.model = self.createNN()
         self.target_model = self.createNN()
@@ -38,7 +43,8 @@ class DQN_Agent():
 
     def createNN(self):
         model = Sequential()
-        model.add(Dense(self.hidden_layers_dim[0], input_shape=(self.obs_space,)))
+        #print("!!!!!", self.obs_space)
+        model.add(Dense(self.hidden_layers_dim[0], input_dim=self.obs_space))
         for i in range(1,len(self.hidden_layers_dim)):
             if len(self.hidden_layers_dim)== len(self.activation_function): #If there are different activation functions for different hidden layers
                 model.add(Dense(self.hidden_layers_dim[i], activation = self.activation_function[i]))
@@ -52,20 +58,70 @@ class DQN_Agent():
         return self.model.predict(obs)
 
     def get_action(self, obs):
+        #print(obs)
+        #print(np.shape(obs))
         return np.argmax(self.target_model.predict(obs))
 
-
     def update_replay_memory(self,sars_d):
+        if len(self.replay_memory)>= REPLAY_MEMORY_SIZE:
+            #print(type(self.replay_memory))
+            self.replay_memory = np.delete(self.replay_memory,0)
+        self.replay_memory = np.append(self.replay_memory,sars_d)
+
+
+    def __update_replay_memory(self,sars_d):
         if self.replay_memory.size() == REPLAY_MEMORY_SIZE:
             self.replay_memory.dequeue()
         self.replay_memory.enqueue(sars_d)
 
-    def update_network(self):
+
+
+    def sample_random_situations(self):
+        nums = random.sample(range(0,MIN_REPLAY_MEMORY_SIZE),MINI_BATCH_SIZE)
+        mini_batch=[None]*MINI_BATCH_SIZE
+        for i in range(0,MINI_BATCH_SIZE):
+            mini_batch[i]=self.replay_memory[nums[i]]
+        return mini_batch
+
+    def update_network(self, s,a,r,s_,d):
+        if d:
+            y = r
+        else:
+            y = r + self.gamma*np.max(self.get_q_values(s_))
+        self.model.fit(s,y)
+
+    def update_network_minibatch(self):
+        if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
+            return None
+        else:
+            y=np.zeros(len(mini_batch))
+            mini_batch = self.sample_random_situations()
+            for i in range(0,len(mini_batch)):
+                if mini_batch[i][4]:
+                    y[i]=mini_batch[i][2]
+                else:
+                    y[i]=mini_batch[i][2] + self.gamma*np.max(self.target_model.predict(mini_batch[3]))
+                    ###EKSTRA BRAKCET?
+            self.model.fit(mini_batch[0],y, batch_size = TRAIN_BATCH_SIZE, verbose=0, shuffle=False)
+
+
+
+
+
+    def __update_network(self):
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
             return None
         else:
             #randomly sample from the replay_memory
-            batch = random.sample(self.replay_memory,TRAIN_BATCH_SIZE )
+            full_list = self.replay_memory
+            batch =np.array(TRAIN_BATCH_SIZE)
+            for i in range(0,TRAIN_BATCH_SIZE):
+                r = np.random.randint(0,len(self.replay_memory)-i)
+                batch[i]=full_list[r]
+                full_list = np.delete(full_list,r)
+            #batch = random.sample(list(self.replay_memory),TRAIN_BATCH_SIZE )
+            #print("BATCH[0] = ",batch.shape())
+            print(batch)
             states = np.array([situation[0] for situation in batch])
             next_states = np.array([situation[3] for situation in batch])
 
