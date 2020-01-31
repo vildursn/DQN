@@ -14,13 +14,16 @@ MINI_BATCH_SIZE = 100
 UPDATE_TARGET_NUM = 10
 
 class replay_memory():
-    def __init__(self, size):
-        pass
+    def __init__(self, size, obs_space):
+        self.obs = np.zeros(size, obs_space+ action_space)
+        self.actions = np.zeros(size)
+        self.rewards = np.zeros(size)
+        self.obs_next = np.zeros(size,obs_space+action_space)
 class DQN_Agent():
     #self.Q_function = Q_function()
     #self.replay_memory = Replay
 #obs space and action space just wants their lengths, and they are all assumed to be discrete?
-    def __init__(self,D_size,obs_space, action_space, epsilon, gamma, alpha, activation_function,hidden_layers_dim):
+    def __init__(self,D_size,obs_space, action_space, epsilon, gamma, alpha, activation_function,DISC_SPACES,hidden_layers_dim):
         self.d_size = D_size
         self.target_update_counter = 0
         self.epsilon = epsilon
@@ -30,43 +33,82 @@ class DQN_Agent():
         self.action_space = action_space
         self.hidden_layers_dim = hidden_layers_dim
         self.activation_function = activation_function
+        self.DISC_SPACES=DISC_SPACES
         #datatype=[tf.int64]*(self.obs_space*2+2)
         #datatype.append(tf.bool)
         #self.replay_memory = tf.queue.FIFOQueue(REPLAY_MEMORY_SIZE, dtypes=datatype)#, shape=[obs_space,1,1,obs_space,1], shape =  [self.obs_space, self.action_space,1, self.obs_space])
-        self.replay_memory = []
+        self.replay_memory = np.array((50,5))
+        self.replay_memory_counter = 0
+        self.replay_memory_full = False
 
         self.model = self.createNN()
         self.target_model = self.createNN()
         self.target_model.set_weights(self.model.get_weights())
 
         self.tensorboard = ModifiedTensorBoard(log_dir="logs/{}-{}".format('MODEL_NAME', int(time.time())))
-
+    def print_replay_memory(self):
+        print(np.shape(self.replay_memory))
     def createNN(self):
         model = Sequential()
         #print("!!!!!", self.obs_space)
-        model.add(Dense(self.hidden_layers_dim[0], input_dim=self.obs_space))
+        model.add(Dense(self.hidden_layers_dim[0], input_dim=self.obs_space+self.action_space))
         for i in range(1,len(self.hidden_layers_dim)):
             if len(self.hidden_layers_dim)== len(self.activation_function): #If there are different activation functions for different hidden layers
                 model.add(Dense(self.hidden_layers_dim[i], activation = self.activation_function[i]))
             else:
                 model.add(Dense(self.hidden_layers_dim[i], activation = self.activation_function[0]))
-        model.add(Dense(self.action_space, activation = tf.nn.sigmoid))
+        model.add(Dense(1, activation = tf.nn.sigmoid))
         model.compile(loss='mse', optimizer='sgd')#learning_rate = self.alpha,
         return model
+    def cont_to_disc_obs(self,obs):
+        #### OBS OBS MÅ ENDRES PÅ HVIS ENDRINGER I ENVIRONMENT!!!!
+        disc_obs =np.zeros(self.obs_space)
+        DISC_SPACES = self.DISC_SPACES
+        x = obs[0]
+        x+=4.8
+        for i in range(0,DISC_SPACES[0]):
+            if x<=((4.8*2)/DISC_SPACES[0])*i:
+                disc_obs[i]=1
+                break
+        x=obs[1]
+        if x >0:
+            disc_obs[DISC_SPACES[0]]=1
+        else:
+            disc_obs[DISC_SPACES[0]+1]=1
+
+        x= obs[2]
+        x+=0.42
+        for i in range(0,DISC_SPACES[2]):
+            if x<=((0.42*2)/DISC_SPACES[2])*i:
+                disc_obs[DISC_SPACES[0]+DISC_SPACES[1]+i]=1
+                break
+        x=obs[3]
+        if x >0:
+            disc_obs[DISC_SPACES[0]+DISC_SPACES[1]+DISC_SPACES[2]]=1
+        else:
+            disc_obs[DISC_SPACES[0]+DISC_SPACES[1]+DISC_SPACES[2]+1]=1
+        return disc_obs
+
+
+    def obs_to_nn(self,obs):
+        return [[self.cont_to_disc_obs(obs)]]
 
     def get_q_values(self, obs):
-        return self.model.predict(obs)
+        return self.model.predict(self.obs_to_nn(obs))
 
     def get_action(self, obs):
         #print(obs)
         #print(np.shape(obs))
-        return np.argmax(self.target_model.predict(obs))
+        return np.argmax(self.target_model.predict(self.obs_to_nn(obs)))
 
     def update_replay_memory(self,sars_d):
-        if len(self.replay_memory)>= REPLAY_MEMORY_SIZE:
-            #print(type(self.replay_memory))
-            self.replay_memory = np.delete(self.replay_memory,0)
-        self.replay_memory = np.append(self.replay_memory,sars_d)
+
+        if self.replay_memory_counter == REPLAY_MEMORY_SIZE:
+            if self.replay_memory_full == False:
+                self.replay_memory_full = True
+            self.replay_memory_counter = 0
+        self.replay_memory[self.replay_memory_counter] = sars_d
+        self.replay_memory_counter += 1
 
 
     def __update_replay_memory(self,sars_d):
@@ -88,7 +130,7 @@ class DQN_Agent():
             y = r
         else:
             y = r + self.gamma*np.max(self.get_q_values(s_))
-        self.model.fit(s,y)
+        self.model.fit(self.obs_to_nn(s),y, batch_size = 1)
 
     def update_network_minibatch(self):
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
@@ -100,9 +142,9 @@ class DQN_Agent():
                 if mini_batch[i][4]:
                     y[i]=mini_batch[i][2]
                 else:
-                    y[i]=mini_batch[i][2] + self.gamma*np.max(self.target_model.predict(mini_batch[3]))
+                    y[i]=mini_batch[i][2] + self.gamma*np.max(self.target_model.predict(self.obs_to_nn(mini_batch[3])))
                     ###EKSTRA BRAKCET?
-            self.model.fit(mini_batch[0],y, batch_size = TRAIN_BATCH_SIZE, verbose=0, shuffle=False)
+            self.model.fit(mini_batch,y, batch_size = TRAIN_BATCH_SIZE, verbose=0, shuffle=False)
 
 
 

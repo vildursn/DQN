@@ -44,28 +44,42 @@ def cont_to_disc_obs(obs):
 
 
 def obs_to_nn(obs):
-    return [[obs]]
+    return [[cont_to_disc_obs(obs)]]
 
 env = gym.make('CartPole-v0')
 #obs_space = env.observation_space.shape[0]
 action_space = env.action_space.n
-agent = Agent.DQN_Agent(D_size = REPLAY_MEMORY_SIZE,obs_space = DISC_OBS_SPACE, action_space = action_space, epsilon=0.5, gamma = DISCOUNT, alpha=LEARNING_RATE, activation_function = ['tanh'],hidden_layers_dim=[10,10,10])
+agent = Agent.DQN_Agent(D_size = REPLAY_MEMORY_SIZE,obs_space = DISC_OBS_SPACE, action_space = action_space, epsilon=0.5, gamma = DISCOUNT, alpha=LEARNING_RATE, activation_function = ['tanh'],DISC_SPACES=[12,2,12,2],hidden_layers_dim=[10,10,10])
 test=True
 obs= tf.Variable(tf.zeros([DISC_OBS_SPACE]))
 if test:
-    obs = env.reset()
-    print(obs)
-    obs=obs
+    agent.print_replay_memory()
+    for i in range(0,50):
+        obs = env.reset()
+        #print(obs)
+        action = agent.get_action(obs)
+        #print(action)
+        returned = env.step(action)
+        #print(returned)
+        obs_next, reward, done, _ = returned
+        #print(obs_next, reward, done)
+        agent.update_replay_memory([obs,action, reward, obs_next, done])
+
+    agent.print_replay_memory()
+    #agent.update_network(obs, action, reward, obs_next, done)
     #print([[obs]])
     #print(np.shape([[obs]]))
-    action=agent.get_action(obs)
-    returned = env.step(action)
-    obs_next= cont_to_disc_obs(returned[0])
-    reward = returned[1]
+    #action = agent.get_action(obs)
+    #print(action)
+    #action=agent.get_action([[cont_to_disc_obs(obs),cont_to_disc_obs(obs)]])
+    #print(action)
+    #returned = env.step(action)
+    #obs_next= cont_to_disc_obs(returned[0])
+    #reward = returned[1]
     #tot_Reward+=reward
-    d=returned[2]
-    agent.update_network(obs,action, reward, obs_to_nn(obs_next),d)
-    print(action)
+    #d=returned[2]
+    #agent.update_network(obs,action, reward, obs_next,d)
+    #print(action)
 else:
     rewardz = []
     for e in range(0, NUM_EPISODES):
