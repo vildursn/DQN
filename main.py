@@ -49,23 +49,36 @@ def obs_to_nn(obs):
 env = gym.make('CartPole-v0')
 #obs_space = env.observation_space.shape[0]
 action_space = env.action_space.n
-agent = Agent.DQN_Agent(D_size = REPLAY_MEMORY_SIZE,obs_space = DISC_OBS_SPACE, action_space = action_space, epsilon=0.5, gamma = DISCOUNT, alpha=LEARNING_RATE, activation_function = ['tanh'],DISC_SPACES=[12,2,12,2],hidden_layers_dim=[10,10,10])
+agent = Agent.DQN_Agent(replay_size = REPLAY_MEMORY_SIZE,obs_space = DISC_OBS_SPACE, action_space = action_space, epsilon=0.5, gamma = DISCOUNT, alpha=LEARNING_RATE, activation_function = ['tanh'],DISC_SPACES=[12,2,12,2],hidden_layers_dim=[10,10,10])
 test=True
-obs= tf.Variable(tf.zeros([DISC_OBS_SPACE]))
 if test:
-    agent.print_replay_memory()
-    for i in range(0,50):
-        obs = env.reset()
+    #agent.print_replay_memory()
+    #for i in range(0,50):
+    obs = env.reset()
         #print(obs)
-        action = agent.get_action(obs)
-        #print(action)
-        returned = env.step(action)
-        #print(returned)
-        obs_next, reward, done, _ = returned
-        #print(obs_next, reward, done)
-        agent.update_replay_memory([obs,action, reward, obs_next, done])
+    action = np.argmax(agent.get_q_values_model(obs))
+    #print(action)
+    obs_next, reward, done, _ = env.step(action)
+    #print(obs_next)
 
-    agent.print_replay_memory()
+    for i in range(0,60):
+        obs = env.reset()
+        action = np.argmax(agent.get_q_values_model(obs))
+        obs_next, reward, done, _ = env.step(action)
+        agent.replay_memory.add_experience(cont_to_disc_obs(obs),action, reward, cont_to_disc_obs(obs_next),done)
+
+    s,a,r,s_,d =agent.replay_memory.get_mini_batch(10)
+
+    agent.update_network_minibatch(s,a,r,s_,d)
+
+    #agent.update_network(obs, action, reward, obs_next,done)
+        #returned = env.step(action)
+        #print(returned)
+        #obs_next, reward, done, _ = returned
+        #print(obs_next, reward, done)
+        #agent.update_replay_memory([obs,action, reward, obs_next, done])
+
+    #   agent.print_replay_memory()
     #agent.update_network(obs, action, reward, obs_next, done)
     #print([[obs]])
     #print(np.shape([[obs]]))
