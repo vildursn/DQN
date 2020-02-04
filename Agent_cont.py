@@ -172,7 +172,7 @@ class DQN_Agent():
         self.target_model.set_weights(new_weights)
 
     def save_target_model(self):
-        self.target_model.save("Target_model - 04.02.20 - new")
+        self.target_model.save("Target_model040220_2")
         print("Model saved.")
 
         #self.target_model.set_weights(self.model.get_weights()*0.9 + self.target_model.get_weights()*0.1)

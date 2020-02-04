@@ -17,9 +17,25 @@ obs_space = 4
 obs = env.reset()
 r=0
 done = False
+tot_r = []
+for i in range(0,10):
+    done = False
+    obs = env.reset()
+    r = 0
+    while not done:
+        #env.render()
+        action = np.argmax(agent.get_q_values_target_model(obs))
+        obs_next, reward, done, _ = env.step(action)
+        r += reward
+        obs=obs_next
+    tot_r.append(r)
+
+print(np.average(tot_r))
+
+done = False
+obs = env.reset()
 while not done:
     env.render()
     action = np.argmax(agent.get_q_values_target_model(obs))
     obs_next, reward, done, _ = env.step(action)
-    r += reward
     obs=obs_next

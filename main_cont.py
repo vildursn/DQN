@@ -54,7 +54,7 @@ def train_agent(agent,NUM_EPISODES, EXPERIENCE_REPLAY_SIZE, TRAIN_BATCH_SIZE, UP
         epsilon = epsilon_decay(e,epsilon)
         #epsilon = 0.5
         episode_return = 0
-        for step in range(0,250):
+        for step in range(0,200):
             print("Episode number ",e)
             rand = random.random()
             if rand <epsilon:
@@ -64,7 +64,7 @@ def train_agent(agent,NUM_EPISODES, EXPERIENCE_REPLAY_SIZE, TRAIN_BATCH_SIZE, UP
             obs_next, reward, done, _ = env.step(action)
 
             if done:
-                if step < 250:
+                if step < 200:
                     reward = -1
                 else:
                     reward = 10
