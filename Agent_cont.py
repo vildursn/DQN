@@ -63,12 +63,13 @@ class replay_memory():
         return s,a,r,s_,d
 
 
-
-
 class DQN_Agent():
     #self.Q_function = Q_function()
     #self.replay_memory = Replay
 #obs space and action space just wants their lengths, and they are all assumed to be discrete?
+    def __init__(self, model):
+        self.target_model = model
+
     def __init__(self,replay_size,obs_space, action_space, epsilon, gamma, alpha, activation_function,hidden_layers_dim):
 
         self.target_update_counter = 0
@@ -162,13 +163,25 @@ class DQN_Agent():
                 y[i]=r[i]
             else:
                 y[i] = r[i] + self.gamma*np.max(self.get_q_values_model(s_[i]))
-        self.model.fit(inputs,y, batch_size = len(a),epochs = 50, verbose = 0)
+        self.model.fit(inputs,y, batch_size = len(a),epochs = 10, verbose = 0)
 
     def update_target_network(self):
-        self.target_model.set_weights(self.model.get_weights())
+        t_w = np.array(self.target_model.get_weights())
+        m_w = np.array(self.model.get_weights())
+        new_weights = 0.1*t_w + 0.9*m_w
+        self.target_model.set_weights(new_weights)
+
+    def save_target_model(self):
+        self.target_model.save("Target_model - 04.02.20 - new")
+        print("Model saved.")
+
+        #self.target_model.set_weights(self.model.get_weights()*0.9 + self.target_model.get_weights()*0.1)
 
 
-
+class Pretrained_Agent(DQN_Agent):
+    def __init__(self,model, action_space):
+        self.target_model = model
+        self.action_space = action_space
 class ModifiedTensorBoard(TensorBoard):
 
     # Overriding init to set initial step and writer (we want one log file for all .fit() calls)

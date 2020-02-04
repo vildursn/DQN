@@ -7,11 +7,6 @@ from tensorflow.keras.callbacks import TensorBoard
 import time
 import random
 
-DISCOUNT = 0.99
-REPLAY_MEMORY_SIZE = 50
-MIN_REPLAY_MEMORY_SIZE = 1_000
-MINI_BATCH_SIZE = 100
-UPDATE_TARGET_NUM = 10
 
 class replay_memory():
     def __init__(self, size, obs_space,action_space):
@@ -36,7 +31,8 @@ class replay_memory():
         if self.counter == self.size :
             self.replay_memory_full = True
             self.counter =0
-
+    def is_replay_memory_full(self):
+        return self.replay_memory_full
     def print_replay_memory(self):
         if self.replay_memory_full:
             for i in range(0,self.size):
@@ -65,6 +61,8 @@ class replay_memory():
                     s_[i]=self.obs_nexts[i]
                     d[i]=self.done[i]
         return s,a,r,s_,d
+
+
 
 
 class DQN_Agent():
@@ -194,8 +192,12 @@ class DQN_Agent():
             if d[i] :
                 y[i]=r[i]
             else:
-                y[i] = r[i] + self.gamma*np.max(self.get_q_values_target_model(s_[i]))
-        self.model.fit(inputs,y)
+                y[i] = r[i] + self.gamma*np.max(self.get_q_values_model(s_[i]))
+        self.model.fit(inputs,y, batch_size = len(a),epochs = 100, verbose = 2)
+
+    def update_target_network(self):
+        self.target_model.set_weights(0.2*self.target_model.get_weights()+0.8*self.model.get_weights())
+
 
 
 class ModifiedTensorBoard(TensorBoard):
